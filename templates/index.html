@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='style.css') }}">
+</head>
+<body>
+    <div>
+        <h1>Upload an image with 简谱.</h1>
+    </div>
+    <div>
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="img">
+            <input type="submit" value="Upload">
+        </form>
+    </div>
+
+    {% block content %}
+    {% endblock %}
+</body>
+</html>

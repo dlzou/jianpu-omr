@@ -1,0 +1,21 @@
+{% extends "index.html" %}
+
+{% block content %}
+{% if success == 1 %}
+<div>
+    <img src="{{ img_path }}">
+    <br>
+    <p>Image failed to process :(</p>
+</div>
+{% elif success == 2 %}
+<div>
+    <img src="{{ img_path }}">
+    <br>
+    <p>Mission accomplished :)</p>
+</div>
+{% else %}
+<div>
+    <p>Failed to upload :(</p>
+</div>
+{% endif %}
+{% endblock %}
