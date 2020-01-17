@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+from skimage.feature import peak_local_max
+from skimage.morphology import watershed
+from scipy import ndimage
 import numpy as np
 import cv2 as cv
 
@@ -133,13 +136,13 @@ def bleach_shadows(img):
     return np.uint8(cv.normalize(adjusted, adjusted, 0, 255, cv.NORM_MINMAX))
 
 
-def dissect_rows(bin, img, low_bound=5, min_height=20):
-    assert bin.ndim == 2, 'bin must be negative binary'
-    assert bin.shape[:2] == img.shape[:2], 'bin and img must have same height and width'
+def dissect_rows(img, binary, low_bound=5, min_height=20):
+    assert binary.ndim == 2, 'binary must be negative binary'
+    assert binary.shape[:2] == img.shape[:2], 'binary and img must have same height and width'
 
     # row_chart = np.zeros(bin.shape, np.uint8)
-    projection_y = bin.sum(axis=1) / 255
-    ranges = []
+    projection_y = binary.sum(axis=1) / 255
+    row_ranges = []
     top = -1
 
     for i, size in enumerate(projection_y):
@@ -148,12 +151,12 @@ def dissect_rows(bin, img, low_bound=5, min_height=20):
             if size > low_bound:
                 top = i
         elif size <= low_bound and i-top >= min_height:
-            ranges.append((top, i))
+            row_ranges.append((top, i))
             top = -1
         # row_chart[i, :size] += 255
 
     # col_charts = []
-    # for top, bottom in ranges:
+    # for top, bottom in row_ranges:
     #     cropped_bin = bin[top:bottom, :bin.shape[1]]
     #     projection_x = cropped_bin.sum(axis=0) / 255
 
@@ -163,22 +166,41 @@ def dissect_rows(bin, img, low_bound=5, min_height=20):
     #         col_chart[col_chart.shape[0]-size:, i] += 255
     #     col_charts.append(col_chart)
 
-    row_imgs = []
-    for top, bottom in ranges:
+    row_bins, row_imgs = [], []
+    for top, bottom in row_ranges:
+        row_bins.append(binary[top:bottom, :binary.shape[1]])
         row_imgs.append(img[top:bottom, :img.shape[1]])
 
     # display('Row Chart', row_chart)
     # display('Column Chart', bordered_stack(col_charts, 0))
-    return row_imgs, ranges
+    return row_imgs, row_bins, row_ranges
 
 
-def floodfill_size(bin, seed):
-    assert isinstance(seed, tuple), 'seed must be tuple (x, y))'
+def fill_symbol(img, binary, seed, expand=1):
+    assert isinstance(seed, tuple)
+    mask = np.zeros(tuple(s+2 for s in binary.shape), np.uint8)
+    area, binary, mask, (x, y, w, h) = cv.floodFill(binary, mask, seed, (127), (0), (0), flags=(8 | 255 << 8))
+    mask = mask[1:-1, 1:-1]
+    mask = cv.dilate(mask, np.ones((2*expand+1, 2*expand+1), np.uint8)) \
+        [max(0, y-expand) : y+h+expand, max(0, x-expand) : x+w+expand]
 
-    def _helper(bin, pos, w, h):
-        pass
+    img = img[max(0, y-expand) : y+h+expand, max(0, x-expand) : x+w+expand]
+    result = np.ones(mask.shape, np.uint8) * 255
+    cropped = cv.bitwise_and(img, img, mask=mask)
+    result[mask == 255] = cropped[mask == 255]
 
-    return _helper(bin, seed, 0, 0)
+    xywh = (max(0, x-expand) + result.shape[1]//2, max(0, y-expand) + result.shape[0]//2, result.shape[1], result.shape[0])
+    # display('symbol ' + str(xywh), result)
+    return xywh, result
+
+
+def dissect_symbols(img, binary):
+    symbols_dict = {}
+    for pos, pixel in np.ndenumerate(binary):
+        if pixel > 250:
+            xywh, symbol = fill_symbol(img, binary, (pos[1], pos[0]))
+            symbols_dict[xywh] = symbol
+    return symbols_dict
 
 
 if __name__ == '__main__':
