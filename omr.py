@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import matplotlib.pyplot as plt
 import numpy as np
 import cv2 as cv
 import util
@@ -7,21 +8,31 @@ import util
 class JianPuLine:
     def __init__(self, img, symbols_dict):
         self.img = img
-        self._classify(symbols_dict, (img.shape[1], img.shape[0]))
+        self.symbols_dict = symbols_dict
+        self._classify()
 
-    def _classify(self, symbols_dict, dim):
-        """
-        Classify segmented symbols.
-        ARGS:
-        symbols_dict -- dict where keys are (x, y, w, h), and values are segmented symbol images
-        dim -- tuple cotaining width and height of row image
-        """
+
+    def visualize(self):
+        areas = []
+        for (x, y, w, h), symbol in self.symbols_dict.items():
+            areas.append(w * h)
+        plt.hist(areas, bins=range(min(areas), max(areas)+1))
+        plt.show()
+
+
+    def _classify(self):
+        """Classify segmented symbols"""
+
+        dim = (self.img.shape[1], self.img.shape[0])
         self.notes, self.chars, self.bars, self.dots, self.lines, self.slurs = {}, {}, [], [], [], []
-        for (x, y, w, h), symbol in symbols_dict.items():
+
+        for (x, y, w, h), symbol in self.symbols_dict.items():
             if h > dim[1] / 2 and h / w > 4:
+                # double bar needs to be grouped
                 self.bars.append((x, y, w, h))
-            elif w > dim[1] / 4 and w / h > 2:
+            elif w > dim[1] / 5 and w / h > 2:
                 if y < dim[1] / 3:
+                    # could be repetition brackets
                     self.slurs.append((x, y, w, h))
                 elif y > dim[1] * 2/3:
                     # some dots stuck to lines
@@ -31,11 +42,9 @@ class JianPuLine:
             elif w * h > (dim[1] / 5) ** 2:
                 # note or char
                 self.notes[(x, y, w, h)] = '1'
-            elif w * h > 20:
+            elif w * h > 10 and util.similar(w, h, ratio=0.7):
                 self.dots.append((x, y, w, h))
-            else:
-                self.chars[(x, y, w, h)] = 'u'
-        pass
+
 
     def __str__(self):
         return (f'Notes: {len(self.notes)}\n'
@@ -62,12 +71,9 @@ def jianpu_to_midi(img_path):
     binarized = cv.bitwise_not(binarized)
     row_imgs, row_bins, row_ranges = util.dissect_rows(adjusted, binarized)
 
-    # single_bin = row_bins[7]
-    # mask = np.zeros(tuple(s+2 for s in single_bin.shape), np.uint8)
-    # area, single_bin, mask, (x, y, w, h) = cv.floodFill(single_bin, mask, (432, 30), (127), (0), (0), flags=(8 | 255 << 8))
-    # util.fill_symbol(row_bins[7], row_imgs[7], (310, 30))
-    symbols_dict = util.dissect_symbols(row_imgs[4], row_bins[4])
-    line = JianPuLine(row_imgs[4], symbols_dict)
+    symbols_dict = util.dissect_symbols(row_imgs[3], row_bins[3])
+    line = JianPuLine(row_imgs[3], symbols_dict)
+    # line.visualize()
     print(line)
 
     util.display('Original', original)
@@ -80,4 +86,4 @@ def jianpu_to_midi(img_path):
     return binarized
 
 if __name__ == '__main__':
-    jianpu_to_midi('/home/dlzou/code/projects/omr/media/uploaded_img/IMG_3350.jpg')
+    jianpu_to_midi('/home/dlzou/code/projects/omr/media/uploaded_img/IMG_3341.png')

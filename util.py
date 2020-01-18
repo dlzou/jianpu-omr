@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-from skimage.feature import peak_local_max
-from skimage.morphology import watershed
-from scipy import ndimage
+# from skimage.feature import peak_local_max
+# from skimage import morphology
+# from scipy import ndimage
 import numpy as np
 import cv2 as cv
 
@@ -25,12 +25,14 @@ def bordered_stack(imgs, axis):
         return np.hstack(imgs)
 
 
-def approx(a, b, proportion=0.95):
+def similar(a, b, ratio=0.95):
     small, big = min(abs(a), abs(b)), max(abs(a), abs(b))
-    return small / big >= proportion
+    return small / big >= ratio
 
 
 def order_rect_points(points):
+    """Order rectangle vertices as [tl, tr, br, bl]"""
+
     rect = np.zeros((4, 2), np.float32)
 
     s = points.sum(axis=1)
@@ -40,8 +42,6 @@ def order_rect_points(points):
     d = np.diff(points, axis=1)
     rect[1] = points[np.argmin(d)]
     rect[3] = points[np.argmax(d)]
-
-    # rect = [tl, tr, br, bl]
     return rect
 
 
@@ -125,8 +125,9 @@ def page_detection_line(img, k_blur=25):
     cv.destroyAllWindows()
 
 
-# white image adjustment
+
 def bleach_shadows(img):
+    """Perform white image adjustment"""
     assert img.ndim == 2, 'img must be grayscale'
 
     kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (9, 9))
@@ -190,9 +191,8 @@ def fill_symbol(img, binary, seed, expand=1):
     cropped = cv.bitwise_and(img, img, mask=mask)
     result[mask == 255] = cropped[mask == 255]
 
-    xywh = (max(0, x-expand) + result.shape[1]//2, max(0, y-expand) + result.shape[0]//2, result.shape[1], result.shape[0])
-    # if xywh == (1011, 59, 56, 12) or xywh == (1081, 59, 57, 12):
-    #     display('symbol ' + str(xywh), result)
+    xywh = (max(0, x-expand), max(0, y-expand), result.shape[1], result.shape[0])
+    # display('symbol ' + str(xywh), result)
     return xywh, result
 
 
