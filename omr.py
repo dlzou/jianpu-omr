@@ -66,8 +66,8 @@ def jianpu_to_midi(img_path):
     # mask = np.zeros(tuple(s+2 for s in single_bin.shape), np.uint8)
     # area, single_bin, mask, (x, y, w, h) = cv.floodFill(single_bin, mask, (432, 30), (127), (0), (0), flags=(8 | 255 << 8))
     # util.fill_symbol(row_bins[7], row_imgs[7], (310, 30))
-    symbols_dict = util.dissect_symbols(row_imgs[5], row_bins[5])
-    line = JianPuLine(row_imgs[5], symbols_dict)
+    symbols_dict = util.dissect_symbols(row_imgs[4], row_bins[4])
+    line = JianPuLine(row_imgs[4], symbols_dict)
     print(line)
 
     util.display('Original', original)

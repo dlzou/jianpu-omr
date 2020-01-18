@@ -150,8 +150,9 @@ def dissect_rows(img, binary, low_bound=5, min_height=20):
         if top == -1:
             if size > low_bound:
                 top = i
-        elif size <= low_bound and i-top >= min_height:
-            row_ranges.append((top, i))
+        elif size <= low_bound:
+            if i-top >= min_height:
+                row_ranges.append((top, i))
             top = -1
         # row_chart[i, :size] += 255
 
@@ -190,7 +191,8 @@ def fill_symbol(img, binary, seed, expand=1):
     result[mask == 255] = cropped[mask == 255]
 
     xywh = (max(0, x-expand) + result.shape[1]//2, max(0, y-expand) + result.shape[0]//2, result.shape[1], result.shape[0])
-    # display('symbol ' + str(xywh), result)
+    # if xywh == (1011, 59, 56, 12) or xywh == (1081, 59, 57, 12):
+    #     display('symbol ' + str(xywh), result)
     return xywh, result
 
 
