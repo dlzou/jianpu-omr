@@ -1,16 +1,36 @@
 #!/usr/bin/env python
+from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2 as cv
 import util
 
 
-class JianPuLine:
+"""
+- use height of bars instead of row
+- group notes with dots and lines
+- group bars for or repetition
+- slurs vs. brackets: check top left corner
+- also need to process key/tempo above music
+- parent class TextLine
+"""
+
+class AbstractLine(ABC):
+
     def __init__(self, img, symbols_dict):
         self.img = img
         self.symbols_dict = symbols_dict
         self._classify()
 
+    @abstractmethod
+    def _classify(self):
+        pass
+
+    def _group(self):
+        pass
+
+    def _in_region(self):
+        pass
 
     def visualize(self):
         areas = []
@@ -18,6 +38,15 @@ class JianPuLine:
             areas.append(w * h)
         plt.hist(areas, bins=range(min(areas), max(areas)+1))
         plt.show()
+
+    @staticmethod
+    def construct(img, symbols_dict):
+        return JianPuLine(img, symbols_dict)
+
+
+class JianPuLine(AbstractLine):
+    def __init__(self, img, symbols_dict):
+        super().__init__(img, symbols_dict)
 
 
     def _classify(self):
@@ -72,7 +101,8 @@ def jianpu_to_midi(img_path):
     row_imgs, row_bins, row_ranges = util.dissect_rows(adjusted, binarized)
 
     symbols_dict = util.dissect_symbols(row_imgs[3], row_bins[3])
-    line = JianPuLine(row_imgs[3], symbols_dict)
+    line = AbstractLine.construct(row_imgs[3], symbols_dict)
+    # line = JianPuLine(row_imgs[3], symbols_dict)
     # line.visualize()
     print(line)
 

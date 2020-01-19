@@ -137,7 +137,7 @@ def bleach_shadows(img):
     return np.uint8(cv.normalize(adjusted, adjusted, 0, 255, cv.NORM_MINMAX))
 
 
-def dissect_rows(img, binary, low_bound=5, min_height=20):
+def dissect_rows(img, binary, low_bound=2, min_height=20):
     assert binary.ndim == 2, 'binary must be negative binary'
     assert binary.shape[:2] == img.shape[:2], 'binary and img must have same height and width'
 
@@ -170,8 +170,8 @@ def dissect_rows(img, binary, low_bound=5, min_height=20):
 
     row_bins, row_imgs = [], []
     for top, bottom in row_ranges:
-        row_bins.append(binary[top:bottom, :binary.shape[1]])
-        row_imgs.append(img[top:bottom, :img.shape[1]])
+        row_bins.append(binary[top:bottom+1, :binary.shape[1]])
+        row_imgs.append(img[top:bottom+1, :img.shape[1]])
 
     # display('Row Chart', row_chart)
     # display('Column Chart', bordered_stack(col_charts, 0))
