@@ -5,7 +5,6 @@ import numpy as np
 import cv2 as cv
 import util
 
-
 """
 - use height of bars instead of row
 - group notes with dots and lines
@@ -29,19 +28,22 @@ class AbstractLine(ABC):
     def _group(self):
         pass
 
-    def _in_region(self):
-        pass
-
     def visualize(self):
-        areas = []
+        heights = []
         for (x, y, w, h), symbol in self.symbols_dict.items():
-            areas.append(w * h)
-        plt.hist(areas, bins=range(min(areas), max(areas)+1))
+            heights.append(h)
+        plt.hist(heights, bins=range(min(heights), max(heights)+1))
         plt.show()
 
     @staticmethod
     def construct(img, symbols_dict):
-        return JianPuLine(img, symbols_dict)
+        keys = list(symbols_dict.keys())
+        keys.sort(key=lambda k: k[3])  # sort by h
+
+        if all((lambda w, h: h / w > 4)(w, h) for x, y, w, h in keys[-3:]):
+            return JianPuLine(img, symbols_dict)
+        else:
+            return TextLine(img, symbols_dict)
 
 
 class JianPuLine(AbstractLine):
@@ -71,7 +73,7 @@ class JianPuLine(AbstractLine):
             elif w * h > (dim[1] / 5) ** 2:
                 # note or char
                 self.notes[(x, y, w, h)] = '1'
-            elif w * h > 10 and util.similar(w, h, ratio=0.7):
+            elif w * h > 20 and util.similar(w, h, ratio=0.7):
                 self.dots.append((x, y, w, h))
 
 
@@ -84,11 +86,20 @@ class JianPuLine(AbstractLine):
                 f'Slurs: {len(self.slurs)}\n')
 
 
+class TextLine(AbstractLine):
+    def __init__(self, img, symbols_dict):
+        super().__init__(img, symbols_dict)
+
+
+    def _classify(self):
+        pass
+
+
 def jianpu_to_midi(img_path):
     original = cv.imread(img_path)
     assert original is not None, 'img_path does not exist'
 
-    roi = util.page_detection_contour(original)
+    roi = util.page_detect_contour(original)
     assert roi is not None, 'page does not exist'
     roi = cv.cvtColor(roi, cv.COLOR_BGR2GRAY)
 
@@ -98,17 +109,24 @@ def jianpu_to_midi(img_path):
     # binarized = cv.adaptiveThreshold(blurred, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 8)
     _, binarized = cv.threshold(adjusted, 0, 255, cv.THRESH_BINARY+cv.THRESH_OTSU)
     binarized = cv.bitwise_not(binarized)
-    row_imgs, row_bins, row_ranges = util.dissect_rows(adjusted, binarized)
+    row_imgs, row_binaries, row_ranges = util.dissect_rows(adjusted, binarized)
 
-    symbols_dict = util.dissect_symbols(row_imgs[3], row_bins[3])
-    line = AbstractLine.construct(row_imgs[3], symbols_dict)
+    # symbols_dict = util.dissect_symbols(row_imgs[3], row_binaries[3])
+    # line = AbstractLine.construct(row_imgs[3], symbols_dict)
     # line = JianPuLine(row_imgs[3], symbols_dict)
     # line.visualize()
-    print(line)
+    # print(line)
+
+    lines = []
+    for img, binary in zip(row_imgs, row_binaries):
+        symbols_dict = util.dissect_symbols(img, binary)
+        line = AbstractLine.construct(img, symbols_dict)
+        lines.append(line)
+        print(line)
 
     util.display('Original', original)
     util.display('Binarized', np.hstack((adjusted, binarized)))
-    util.display('Rows', np.hstack((util.bordered_stack(row_imgs, 0), util.bordered_stack(row_bins, 0))))
+    util.display('Rows', np.hstack((util.bordered_stack(row_imgs, 0), util.bordered_stack(row_binaries, 0))))
 
     cv.waitKey(0)
     cv.destroyAllWindows()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-# from skimage.feature import peak_local_max
-# from skimage import morphology
-# from scipy import ndimage
+from sklearn.neighbors import KernelDensity
+from scipy.signal import argrelextrema
+import matplotlib.pyplot as plt
 import numpy as np
 import cv2 as cv
 
@@ -28,6 +28,30 @@ def bordered_stack(imgs, axis):
 def similar(a, b, ratio=0.95):
     small, big = min(abs(a), abs(b)), max(abs(a), abs(b))
     return small / big >= ratio
+
+
+def kde_segment(samples):
+    samples = samples.reshape(-1, 1)
+    bandwidth = 3
+    span = np.linspace(0, 50)
+
+    kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(samples)
+    density = kde.score_samples(span.reshape(-1, 1))
+
+    minima = argrelextrema(density, np.less)[0]
+    print(minima)
+
+    plt.plot(span, density)
+    plt.show()
+
+
+def share_rect_area(xywh1, xywh2, ratio=0.7):
+    x1, y1, w1, h1 = xywh1
+    x2, y2, w2, h2 = xywh2
+    
+    width = min(x1+w1, x2+w2) - max(x1, x2)
+    height = min(y1+h1, y2+h2) - max(y1, y2)
+    return width * height / min(abs(w1*h1), abs(w2*h2)) > ratio
 
 
 def order_rect_points(points):
@@ -64,7 +88,7 @@ def four_point_transform(img, points):
     return cv.warpPerspective(img, M, (max_width, max_height))
 
 
-def page_detection_contour(img, k_blur=15):
+def page_detect_contour(img, k_blur=15):
     # img = cv.imread('/home/dlzou/code/projects/omr/media/uploaded_img/IMG_3341.png')
 
     blurred = cv.medianBlur(img, k_blur)
@@ -101,7 +125,7 @@ def page_detection_contour(img, k_blur=15):
     return None
 
 
-def page_detection_line(img, k_blur=25):
+def page_detect_line(img, k_blur=25):
     img = cv.imread('/home/dlzou/code/projects/omr/media/uploaded_img/IMG_3350.jpg')
 
     blurred = cv.medianBlur(img, k_blur)
@@ -137,7 +161,7 @@ def bleach_shadows(img):
     return np.uint8(cv.normalize(adjusted, adjusted, 0, 255, cv.NORM_MINMAX))
 
 
-def dissect_rows(img, binary, low_bound=2, min_height=20):
+def dissect_rows(img, binary, low_bound=2, min_height=30):
     assert binary.ndim == 2, 'binary must be negative binary'
     assert binary.shape[:2] == img.shape[:2], 'binary and img must have same height and width'
 
@@ -154,7 +178,7 @@ def dissect_rows(img, binary, low_bound=2, min_height=20):
         elif size <= low_bound:
             if i-top >= min_height:
                 row_ranges.append((top, i))
-            top = -1
+                top = -1
         # row_chart[i, :size] += 255
 
     # col_charts = []
@@ -168,14 +192,14 @@ def dissect_rows(img, binary, low_bound=2, min_height=20):
     #         col_chart[col_chart.shape[0]-size:, i] += 255
     #     col_charts.append(col_chart)
 
-    row_bins, row_imgs = [], []
+    row_binaries, row_imgs = [], []
     for top, bottom in row_ranges:
-        row_bins.append(binary[top:bottom+1, :binary.shape[1]])
+        row_binaries.append(binary[top:bottom+1, :binary.shape[1]])
         row_imgs.append(img[top:bottom+1, :img.shape[1]])
 
     # display('Row Chart', row_chart)
     # display('Column Chart', bordered_stack(col_charts, 0))
-    return row_imgs, row_bins, row_ranges
+    return row_imgs, row_binaries, row_ranges
 
 
 def fill_symbol(img, binary, seed, expand=1):
@@ -206,4 +230,5 @@ def dissect_symbols(img, binary):
 
 
 if __name__ == '__main__':
-    page_detection_contour(1)
+    # page_detect_contour(1)
+    kde_segment(np.array([10, 11, 9, 23, 21, 11, 45, 20, 11, 12]))
