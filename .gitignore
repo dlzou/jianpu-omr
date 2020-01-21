@@ -1,6 +1,6 @@
 
-# Created by https://www.gitignore.io/api/flask,python,visualstudiocode
-# Edit at https://www.gitignore.io/?templates=flask,python,visualstudiocode
+# Created by https://www.gitignore.io/api/flask,python,jupyternotebooks,visualstudiocode
+# Edit at https://www.gitignore.io/?templates=flask,python,jupyternotebooks,visualstudiocode
 
 ### Flask ###
 instance/*
@@ -112,6 +112,20 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+### JupyterNotebooks ###
+# gitignore template for Jupyter Notebooks
+# website: http://jupyter.org/
+
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Remove previous ipynb_checkpoints
+#   git rm -r .ipynb_checkpoints/
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 
@@ -170,5 +184,4 @@ dmypy.json
 # Ignore all local history of files
 .history
 
-# End of https://www.gitignore.io/api/flask,python,visualstudiocode
-
+# End of https://www.gitignore.io/api/flask,python,jupyternotebooks,visualstudiocode

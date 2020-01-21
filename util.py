@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from sklearn.neighbors import KernelDensity
-from scipy.signal import argrelextrema
+from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2 as cv
@@ -30,19 +30,24 @@ def similar(a, b, ratio=0.95):
     return small / big >= ratio
 
 
-def kde_segment(samples):
+def kde_segment(samples, bandwidth):
+    samples.sort()
     samples = samples.reshape(-1, 1)
-    bandwidth = 3
-    span = np.linspace(0, 50)
-
+    resolution = len(samples) * 10
+    span = np.linspace(min(samples), max(samples), resolution)
+    
     kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(samples)
-    density = kde.score_samples(span.reshape(-1, 1))
-
-    minima = argrelextrema(density, np.less)[0]
-    print(minima)
-
-    plt.plot(span, density)
-    plt.show()
+    density = np.exp(kde.score_samples(span.reshape(-1, 1)))
+    minima = min(samples) + find_peaks(-density)[0] / resolution * (max(samples)-min(samples))    
+    
+    segments = [[]]
+    i = 0
+    for s in samples:   
+        if i < len(minima) and s >= minima[i]:
+            segments.append([])
+            i += 1
+        segments[-1].append(s)
+    return segments
 
 
 def share_rect_area(xywh1, xywh2, ratio=0.7):
@@ -230,5 +235,4 @@ def dissect_symbols(img, binary):
 
 
 if __name__ == '__main__':
-    # page_detect_contour(1)
-    kde_segment(np.array([10, 11, 9, 23, 21, 11, 45, 20, 11, 12]))
+    page_detect_contour(1)
