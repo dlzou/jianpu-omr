@@ -54,27 +54,42 @@ class JianPuLine(AbstractLine):
     def _classify(self):
         """Classify segmented symbols"""
 
-        dim = (self.img.shape[1], self.img.shape[0])
-        self.notes, self.chars, self.bars, self.dots, self.lines, self.slurs = {}, {}, [], [], [], []
-
-        for (x, y, w, h), symbol in self.symbols_dict.items():
-            if h > dim[1] / 2 and h / w > 4:
-                # double bar needs to be grouped
+        keys_list = list(self.symbols_dict.keys())
+        heights = np.array([k[3] for k in keys_list])
+        highest_break = util.kde_breaks(heights, 5)[-1]
+        tallest_keys = [k for k in keys_list if k[3] > highest_break]
+        self.bars = []
+        for x, y, w, h in tallest_keys:
+            if h / w > 4:
                 self.bars.append((x, y, w, h))
-            elif w > dim[1] / 5 and w / h > 2:
-                if y < dim[1] / 3:
-                    # could be repetition brackets
-                    self.slurs.append((x, y, w, h))
-                elif y > dim[1] * 2/3:
-                    # some dots stuck to lines
-                    self.lines.append((x, y, w, h))
-                else:
-                    self.chars[(x, y, w, h)] = 'u'
-            elif w * h > (dim[1] / 5) ** 2:
-                # note or char
-                self.notes[(x, y, w, h)] = '1'
-            elif w * h > 20 and util.similar(w, h, ratio=0.7):
-                self.dots.append((x, y, w, h))
+                self.symbols_dict.pop((x, y, w, h))
+        bar_height = sum([h for x, y, w, h in self.bars]) / len(self.bars)
+
+        self.notes, self.chars, self.dots, self.lines, self.slurs = {}, {}, [], [], []
+        for (x, y, w, h), symbol in self.symbols_dict.items():
+            continue
+
+        # dim = (self.img.shape[1], self.img.shape[0])
+        # self.notes, self.chars, self.bars, self.dots, self.lines, self.slurs = {}, {}, [], [], [], []
+
+        # for (x, y, w, h), symbol in self.symbols_dict.items():
+        #     if h > dim[1] / 2 and h / w > 4:
+        #         # double bar needs to be grouped
+        #         self.bars.append((x, y, w, h))
+        #     elif w > dim[1] / 5 and w / h > 2:
+        #         if y < dim[1] / 3:
+        #             # could be repetition brackets
+        #             self.slurs.append((x, y, w, h))
+        #         elif y > dim[1] * 2/3:
+        #             # some dots stuck to lines
+        #             self.lines.append((x, y, w, h))
+        #         else:
+        #             self.chars[(x, y, w, h)] = 'u'
+        #     elif w * h > (dim[1] / 5) ** 2:
+        #         # note or char
+        #         self.notes[(x, y, w, h)] = '1'
+        #     elif w * h > 20 and util.similar(w, h, ratio=0.7):
+        #         self.dots.append((x, y, w, h))
 
 
     def __str__(self):
@@ -122,7 +137,7 @@ def jianpu_to_midi(img_path):
         symbols_dict = util.dissect_symbols(img, binary)
         line = AbstractLine.construct(img, symbols_dict)
         lines.append(line)
-        print(line)
+        # print(line)
 
     util.display('Original', original)
     util.display('Binarized', np.hstack((adjusted, binarized)))

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from sklearn.neighbors import KernelDensity
 from scipy.signal import find_peaks
-import matplotlib.pyplot as plt
 import numpy as np
 import cv2 as cv
 
@@ -30,30 +29,21 @@ def similar(a, b, ratio=0.95):
     return small / big >= ratio
 
 
-def kde_segment(samples, bandwidth):
-    samples.sort()
+def kde_breaks(samples, bandwidth):
     samples = samples.reshape(-1, 1)
     resolution = len(samples) * 10
-    span = np.linspace(min(samples), max(samples), resolution)
-    
+    domain = np.linspace(min(samples), max(samples), resolution)
+
     kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(samples)
-    density = np.exp(kde.score_samples(span.reshape(-1, 1)))
-    minima = min(samples) + find_peaks(-density)[0] / resolution * (max(samples)-min(samples))    
-    
-    segments = [[]]
-    i = 0
-    for s in samples:   
-        if i < len(minima) and s >= minima[i]:
-            segments.append([])
-            i += 1
-        segments[-1].append(s)
-    return segments
+    density = np.exp(kde.score_samples(domain.reshape(-1, 1)))
+    minima = min(samples) + find_peaks(-density)[0] / resolution * (max(samples)-min(samples))
+    return minima
 
 
 def share_rect_area(xywh1, xywh2, ratio=0.7):
     x1, y1, w1, h1 = xywh1
     x2, y2, w2, h2 = xywh2
-    
+
     width = min(x1+w1, x2+w2) - max(x1, x2)
     height = min(y1+h1, y2+h2) - max(y1, y2)
     return width * height / min(abs(w1*h1), abs(w2*h2)) > ratio
