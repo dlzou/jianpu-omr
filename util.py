@@ -24,6 +24,10 @@ def bordered_stack(imgs, axis):
         return np.hstack(imgs)
 
 
+def in_range(num, low, high):
+    return num >= low and num < high
+
+
 def similar(a, b, ratio=0.95):
     small, big = min(abs(a), abs(b)), max(abs(a), abs(b))
     return small / big >= ratio
@@ -197,31 +201,32 @@ def dissect_rows(img, binary, low_bound=2, min_height=30):
     return row_imgs, row_binaries, row_ranges
 
 
-def fill_symbol(img, binary, seed, expand=1):
+def fill_object(img, binary, seed, expand=1):
     assert isinstance(seed, tuple)
     mask = np.zeros(tuple(s+2 for s in binary.shape), np.uint8)
     area, binary, mask, (x, y, w, h) = cv.floodFill(binary, mask, seed, (127), (0), (0), flags=(8 | 255 << 8))
     mask = mask[1:-1, 1:-1]
     mask = cv.dilate(mask, np.ones((2*expand+1, 2*expand+1), np.uint8)) \
         [max(0, y-expand) : y+h+expand, max(0, x-expand) : x+w+expand]
-
     img = img[max(0, y-expand) : y+h+expand, max(0, x-expand) : x+w+expand]
+
+    assert img.shape == mask.shape, 'img and mask must have same shape'
     result = np.ones(mask.shape, np.uint8) * 255
     cropped = cv.bitwise_and(img, img, mask=mask)
     result[mask == 255] = cropped[mask == 255]
 
-    xywh = (max(0, x-expand), max(0, y-expand), result.shape[1], result.shape[0])
-    # display('symbol ' + str(xywh), result)
-    return xywh, result
+    # xywh = (max(0, x-expand), max(0, y-expand), result.shape[1], result.shape[0])
+    # display('object ' + str(xywh), result)
+    return (x, y, w, h), result
 
 
-def dissect_symbols(img, binary):
-    symbols_dict = {}
+def dissect_objects(img, binary):
+    obj_dict = {}
     for pos, pixel in np.ndenumerate(binary):
         if pixel > 250:
-            xywh, symbol = fill_symbol(img, binary, (pos[1], pos[0]))
-            symbols_dict[xywh] = symbol
-    return symbols_dict
+            xywh, obj = fill_object(img, binary, (pos[1], pos[0]))
+            obj_dict[xywh] = obj
+    return obj_dict
 
 
 if __name__ == '__main__':

@@ -16,9 +16,9 @@ import util
 
 class AbstractLine(ABC):
 
-    def __init__(self, img, symbols_dict):
+    def __init__(self, img, obj_dict):
         self.img = img
-        self.symbols_dict = symbols_dict
+        self.obj_dict = obj_dict
         self._classify()
 
     @abstractmethod
@@ -30,31 +30,31 @@ class AbstractLine(ABC):
 
     def visualize(self):
         heights = []
-        for (x, y, w, h), symbol in self.symbols_dict.items():
+        for (x, y, w, h), obj in self.obj_dict.items():
             heights.append(h)
         plt.hist(heights, bins=range(min(heights), max(heights)+1))
         plt.show()
 
     @staticmethod
-    def construct(img, symbols_dict):
-        keys = list(symbols_dict.keys())
+    def construct(img, obj_dict):
+        keys = list(obj_dict.keys())
         keys.sort(key=lambda k: k[3])  # sort by h
 
         if all((lambda w, h: h / w > 4)(w, h) for x, y, w, h in keys[-3:]):
-            return JianPuLine(img, symbols_dict)
+            return JianPuLine(img, obj_dict)
         else:
-            return TextLine(img, symbols_dict)
+            return TextLine(img, obj_dict)
 
 
 class JianPuLine(AbstractLine):
-    def __init__(self, img, symbols_dict):
-        super().__init__(img, symbols_dict)
+    def __init__(self, img, obj_dict):
+        super().__init__(img, obj_dict)
 
 
     def _classify(self):
-        """Classify segmented symbols"""
+        """Classify segmented objects"""
 
-        keys_list = list(self.symbols_dict.keys())
+        keys_list = list(self.obj_dict.keys())
         heights = np.array([k[3] for k in keys_list])
         highest_break = util.kde_breaks(heights, 5)[-1]
         tallest_keys = [k for k in keys_list if k[3] > highest_break]
@@ -62,48 +62,50 @@ class JianPuLine(AbstractLine):
         for x, y, w, h in tallest_keys:
             if h / w > 4:
                 self.bars.append((x, y, w, h))
-                self.symbols_dict.pop((x, y, w, h))
+                self.obj_dict.pop((x, y, w, h))
+        
+        assert len(self.bars) > 0, 'no bars found'
         bar_height = sum([h for x, y, w, h in self.bars]) / len(self.bars)
+        print(bar_height)
+        bar_top = sum([y for x, y, w, h in self.bars]) / len(self.bars)
+        img_height = self.img.shape[0]
 
-        self.notes, self.chars, self.dots, self.lines, self.slurs = {}, {}, [], [], []
-        for (x, y, w, h), symbol in self.symbols_dict.items():
-            continue
-
-        # dim = (self.img.shape[1], self.img.shape[0])
-        # self.notes, self.chars, self.bars, self.dots, self.lines, self.slurs = {}, {}, [], [], [], []
-
-        # for (x, y, w, h), symbol in self.symbols_dict.items():
-        #     if h > dim[1] / 2 and h / w > 4:
-        #         # double bar needs to be grouped
-        #         self.bars.append((x, y, w, h))
-        #     elif w > dim[1] / 5 and w / h > 2:
-        #         if y < dim[1] / 3:
-        #             # could be repetition brackets
-        #             self.slurs.append((x, y, w, h))
-        #         elif y > dim[1] * 2/3:
-        #             # some dots stuck to lines
-        #             self.lines.append((x, y, w, h))
-        #         else:
-        #             self.chars[(x, y, w, h)] = 'u'
-        #     elif w * h > (dim[1] / 5) ** 2:
-        #         # note or char
-        #         self.notes[(x, y, w, h)] = '1'
-        #     elif w * h > 20 and util.similar(w, h, ratio=0.7):
-        #         self.dots.append((x, y, w, h))
+        self.notes, self.chars, self.overlines, self.underlines, self.dashes, self.dots, self.unknowns = {}, {}, {}, [], [], [], {}
+        for (x, y, w, h), obj in self.obj_dict.items():
+            if w > bar_height/3 and h < bar_height and w/h > 2:
+                if y < img_height/3:
+                    # is either slur or bracket
+                    self.overlines[(x, y, w, h)] = obj
+                elif y > img_height * 2/3:
+                    # is underline
+                    self.underlines.append((x, y, w, h))
+                elif w < bar_height:
+                    # is dash
+                    self.dashes.append((x, y, w, h))
+            elif util.in_range(w*h, (bar_height/10) ** 2, bar_height ** 2):
+                if w*h > (bar_height/4) ** 2:
+                    # either note or char
+                    self.notes[(x, y, w, h)] = obj
+                else:
+                    # is dot
+                    self.dots.append((x, y, w, h))
+            else:
+                self.unknowns[(x, y, w, h)] = obj
 
 
     def __str__(self):
-        return (f'Notes: {len(self.notes)}\n'
+        return (f'Bars: {len(self.bars)}\n'
+                f'Notes: {len(self.notes)}\n'
                 f'Chars: {len(self.chars)}\n'
-                f'Bars: {len(self.bars)}\n'
+                f'Top lines: {len(self.overlines)}\n'
+                f'Bottom lines: {len(self.underlines)}\n'
+                f'Dashes: {len(self.dashes)}\n'
                 f'Dots: {len(self.dots)}\n'
-                f'Lines: {len(self.lines)}\n'
-                f'Slurs: {len(self.slurs)}\n')
-
+                f'Unknowns: {len(self.unknowns)}\n')
 
 class TextLine(AbstractLine):
-    def __init__(self, img, symbols_dict):
-        super().__init__(img, symbols_dict)
+    def __init__(self, img, obj_dict):
+        super().__init__(img, obj_dict)
 
 
     def _classify(self):
@@ -126,18 +128,17 @@ def jianpu_to_midi(img_path):
     binarized = cv.bitwise_not(binarized)
     row_imgs, row_binaries, row_ranges = util.dissect_rows(adjusted, binarized)
 
-    # symbols_dict = util.dissect_symbols(row_imgs[3], row_binaries[3])
-    # line = AbstractLine.construct(row_imgs[3], symbols_dict)
-    # line = JianPuLine(row_imgs[3], symbols_dict)
-    # line.visualize()
+    # obj_dict = util.dissect_objects(row_imgs[3], row_binaries[3])
+    # line = AbstractLine.construct(row_imgs[3], obj_dict)
+    # # line.visualize()
     # print(line)
 
     lines = []
     for img, binary in zip(row_imgs, row_binaries):
-        symbols_dict = util.dissect_symbols(img, binary)
-        line = AbstractLine.construct(img, symbols_dict)
+        obj_dict = util.dissect_objects(img, binary)
+        line = AbstractLine.construct(img, obj_dict)
         lines.append(line)
-        # print(line)
+        print(line)
 
     util.display('Original', original)
     util.display('Binarized', np.hstack((adjusted, binarized)))
