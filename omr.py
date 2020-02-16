@@ -19,10 +19,10 @@ class AbstractLine(ABC):
     def __init__(self, img, obj_dict):
         self.img = img
         self.obj_dict = obj_dict
-        self._classify()
+        self._categorize()
 
     @abstractmethod
-    def _classify(self):
+    def _categorize(self):
         pass
 
     def _group(self):
@@ -51,7 +51,7 @@ class JianPuLine(AbstractLine):
         super().__init__(img, obj_dict)
 
 
-    def _classify(self):
+    def _categorize(self):
         """Classify segmented objects"""
 
         keys_list = list(self.obj_dict.keys())
@@ -63,14 +63,20 @@ class JianPuLine(AbstractLine):
             if h / w > 4:
                 self.bars.append((x, y, w, h))
                 self.obj_dict.pop((x, y, w, h))
-        
+
         assert len(self.bars) > 0, 'no bars found'
         bar_height = sum([h for x, y, w, h in self.bars]) / len(self.bars)
         print(bar_height)
         bar_top = sum([y for x, y, w, h in self.bars]) / len(self.bars)
         img_height = self.img.shape[0]
+        self.notes = {}
+        self.chars = {}
+        self.overlines = {}
+        self.underlines = []
+        self.dashes = []
+        self.dots = []
+        self.unknowns = {}
 
-        self.notes, self.chars, self.overlines, self.underlines, self.dashes, self.dots, self.unknowns = {}, {}, {}, [], [], [], {}
         for (x, y, w, h), obj in self.obj_dict.items():
             if w > bar_height/3 and h < bar_height and w/h > 2:
                 if y < img_height/3:
@@ -108,7 +114,7 @@ class TextLine(AbstractLine):
         super().__init__(img, obj_dict)
 
 
-    def _classify(self):
+    def _categorize(self):
         pass
 
 
@@ -150,4 +156,4 @@ def jianpu_to_midi(img_path):
     return binarized
 
 if __name__ == '__main__':
-    jianpu_to_midi('/home/dlzou/code/projects/omr/media/uploaded_img/IMG_3341.png')
+    jianpu_to_midi('/home/dlzou/code/projects/omr/media/uploaded_img/IMG_3348.jpg')
