@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2 as cv
 import util
+import traceback
 
 """
 - use height of bars instead of row
@@ -21,12 +22,15 @@ class AbstractLine(ABC):
         self.obj_dict = obj_dict
         self._categorize()
 
+
     @abstractmethod
     def _categorize(self):
         pass
 
+
     def _group(self):
         pass
+
 
     def visualize(self):
         heights = []
@@ -35,41 +39,48 @@ class AbstractLine(ABC):
         plt.hist(heights, bins=range(min(heights), max(heights)+1))
         plt.show()
 
+
     @staticmethod
     def construct(img, obj_dict):
+        """return either JianPuLine or TextLine based on presence of bars"""
         keys = list(obj_dict.keys())
         keys.sort(key=lambda k: k[3])  # sort by h
+        heights = np.array([k[3] for k in keys])
+        breaks = util.kde_breaks(heights, 5)
 
-        if all((lambda w, h: h / w > 4)(w, h) for x, y, w, h in keys[-3:]):
-            return JianPuLine(img, obj_dict)
+        if len(breaks > 0):
+            highest_break = breaks[-1]
+            tallest_keys = [k for k in keys if k[3] > highest_break]
+            bars = []
+            for x, y, w, h in tallest_keys:
+                if h / w > 4:
+                    bars.append((x, y, w, h))
+
+            if len(bars) > 1 and len(bars) < len(keys) / 3:
+                for x, y, w, h in bars:
+                    obj_dict.pop((x, y, w, h))
+                return JianPuLine(img, obj_dict, bars)
+            else:
+                return TextLine(img, obj_dict)
         else:
             return TextLine(img, obj_dict)
 
 
 class JianPuLine(AbstractLine):
-    def __init__(self, img, obj_dict):
+
+    def __init__(self, img, obj_dict, bars):
+        self.bars = bars
         super().__init__(img, obj_dict)
 
 
     def _categorize(self):
         """Classify segmented objects"""
 
-        keys_list = list(self.obj_dict.keys())
-        heights = np.array([k[3] for k in keys_list])
-        highest_break = util.kde_breaks(heights, 5)[-1]
-        tallest_keys = [k for k in keys_list if k[3] > highest_break]
-        self.bars = []
-        for x, y, w, h in tallest_keys:
-            if h / w > 4:
-                self.bars.append((x, y, w, h))
-                self.obj_dict.pop((x, y, w, h))
-
         assert len(self.bars) > 0, 'no bars found'
-        bar_height = sum([h for x, y, w, h in self.bars]) / len(self.bars)
-        print(bar_height)
-        bar_top = sum([y for x, y, w, h in self.bars]) / len(self.bars)
-        img_height = self.img.shape[0]
-        self.notes = {}
+        self.bar_height = sum([h for x, y, w, h in self.bars]) / len(self.bars)
+        self.bar_top = sum([y for x, y, w, h in self.bars]) / len(self.bars)
+        self.img_height = self.img.shape[0]
+        self.notes = {} # empty
         self.chars = {}
         self.overlines = {}
         self.underlines = []
@@ -78,20 +89,20 @@ class JianPuLine(AbstractLine):
         self.unknowns = {}
 
         for (x, y, w, h), obj in self.obj_dict.items():
-            if w > bar_height/3 and h < bar_height and w/h > 2:
-                if y < img_height/3:
+            if w > self.bar_height / 3 and h < self.bar_height and w / h > 2:
+                if y < self.img_height / 3:
                     # is either slur or bracket
                     self.overlines[(x, y, w, h)] = obj
-                elif y > img_height * 2/3:
+                elif y > self.img_height * 2/3:
                     # is underline
                     self.underlines.append((x, y, w, h))
-                elif w < bar_height:
+                elif w < self.bar_height:
                     # is dash
                     self.dashes.append((x, y, w, h))
-            elif util.in_range(w*h, (bar_height/10) ** 2, bar_height ** 2):
-                if w*h > (bar_height/4) ** 2:
+            elif util.in_range(w * h, (self.bar_height / 15) ** 2, self.bar_height ** 2):
+                if w * h > (self.bar_height / 5) ** 2:
                     # either note or char
-                    self.notes[(x, y, w, h)] = obj
+                    self.chars[(x, y, w, h)] = obj
                 else:
                     # is dot
                     self.dots.append((x, y, w, h))
@@ -110,6 +121,7 @@ class JianPuLine(AbstractLine):
                 f'Unknowns: {len(self.unknowns)}\n')
 
 class TextLine(AbstractLine):
+
     def __init__(self, img, obj_dict):
         super().__init__(img, obj_dict)
 
@@ -134,17 +146,25 @@ def jianpu_to_midi(img_path):
     binarized = cv.bitwise_not(binarized)
     row_imgs, row_binaries, row_ranges = util.dissect_rows(adjusted, binarized)
 
-    # obj_dict = util.dissect_objects(row_imgs[3], row_binaries[3])
-    # line = AbstractLine.construct(row_imgs[3], obj_dict)
+    # obj_dict = util.dissect_objects(row_imgs[8], row_binaries[8])
+    # line = AbstractLine.construct(row_imgs[8], obj_dict)
     # # line.visualize()
     # print(line)
+    # for obj_index in line.dots:
+    #     util.display(str(obj_index), obj_dict[obj_index])
 
     lines = []
+    index = 0
     for img, binary in zip(row_imgs, row_binaries):
-        obj_dict = util.dissect_objects(img, binary)
-        line = AbstractLine.construct(img, obj_dict)
-        lines.append(line)
-        print(line)
+        try:
+            obj_dict = util.dissect_objects(img, binary)
+            line = AbstractLine.construct(img, obj_dict)
+            lines.append(line)
+            print(index)
+            print(line)
+        except Exception:
+            traceback.print_exc()
+        index += 1
 
     util.display('Original', original)
     util.display('Binarized', np.hstack((adjusted, binarized)))
@@ -156,4 +176,4 @@ def jianpu_to_midi(img_path):
     return binarized
 
 if __name__ == '__main__':
-    jianpu_to_midi('/home/dlzou/code/projects/omr/media/uploaded_img/IMG_3348.jpg')
+    jianpu_to_midi('/home/dlzou/code/personal/omr/media/uploaded_img/IMG_3341.png')
