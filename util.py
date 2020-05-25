@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 from sklearn.neighbors import KernelDensity
 from scipy.signal import find_peaks
 import numpy as np

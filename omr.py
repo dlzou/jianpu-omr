@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,7 +43,7 @@ class AbstractLine(ABC):
     def construct(img, obj_dict):
         """return either JianPuLine or TextLine based on presence of bars"""
         keys = list(obj_dict.keys())
-        keys.sort(key=lambda k: k[3])  # sort by h
+        keys.sort(key=lambda k: k[3]) # sort by h
         heights = np.array([k[3] for k in keys])
         breaks = util.kde_breaks(heights, 5)
 
@@ -119,6 +118,7 @@ class JianPuLine(AbstractLine):
                 f'Dashes: {len(self.dashes)}\n'
                 f'Dots: {len(self.dots)}\n'
                 f'Unknowns: {len(self.unknowns)}\n')
+
 
 class TextLine(AbstractLine):
 
